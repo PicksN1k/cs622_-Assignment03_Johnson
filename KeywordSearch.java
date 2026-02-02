@@ -9,7 +9,9 @@ import java.util.Scanner;
 Intent:
     The goal of this class is to perform streaming keyword searches on the
     merged JSON dataset and present relevant campaign information to the user.
-    Search history tracking is delegated to the SearchHistory class.
+    Search history tracking is delegated to the SearchHistory class, which
+    records search terms, frequencies, and timestamps for the duration of
+    a single program session.
 */
 public class KeywordSearch {
 
@@ -21,16 +23,25 @@ public class KeywordSearch {
         Path file = Paths.get("Datasets/Merged.json");
         Scanner scanner = new Scanner(System.in);
 
-        // Assignment 3: allow multiple searches in one session
-        for (int i = 0; i < 5; i++) {
-            System.out.print("\nEnter search keyword: ");
-            String keyword = scanner.nextLine().toLowerCase();
+        // Assignment 3: allow an arbitrary number of searches in one session
+        while (true) {
+            System.out.print("\nEnter search keyword (or 'q' to quit): ");
+            String keyword = scanner.nextLine().trim().toLowerCase();
+
+            if (keyword.equals("q")) {
+                break;
+            }
+
+            if (keyword.isEmpty()) {
+                System.out.println("Please enter a non-empty keyword.");
+                continue;
+            }
 
             System.out.println("\n=== Searching for keyword: \"" + keyword + "\" ===");
             searchAndPrint(file, keyword);
         }
 
-        // Print memory summary
+        // Print search history summary after session ends
         searchHistory.printSummary();
         scanner.close();
     }
@@ -57,8 +68,8 @@ public class KeywordSearch {
                 String closeDate = extractJsonString(dataPart, "close_date");
 
                 System.out.println(
-                    "funds_raised_percent=" + percent +
-                    " | close_date=" + closeDate
+                        "funds_raised_percent=" + percent +
+                        " | close_date=" + closeDate
                 );
                 printed++;
             }
