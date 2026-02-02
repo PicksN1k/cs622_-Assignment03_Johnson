@@ -3,17 +3,26 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /*
 Intent:
-    The goal of this class is to support keyword searching within the merged JSON file and
-    present key campaign details to the user. When a keyword is found in a record, the
-    program outputs the corresponding funds_raised_percent and close_date values using
-    a streaming file-reading approach.
+    The goal of this class is to support keyword searching within the merged JSON file
+    and to maintain a history of all search terms used during execution. For each search,
+    the program records the keyword and timestamp, outputs up to a limited number of
+    matching campaign records, and provides a summary of search history statistics
+    using Java Collections.
 */
 public class KeywordSearch {
 
     private static final int MAX_RESULTS = 10;
+
+    // === Assignment 3 memory ===
+    private static Map<String, List<LocalDateTime>> searchHistory = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
 
@@ -26,9 +35,16 @@ public class KeywordSearch {
             System.out.println("\n=== Searching for keyword: \"" + keyword + "\" ===");
             searchAndPrint(file, keyword.toLowerCase());
         }
+
+        // Print search statistics (Assignment 3 requirement)
+        printSearchHistory();
     }
 
     private static void searchAndPrint(Path file, String keyword) throws IOException {
+
+        // Record search term + timestamp
+        recordSearch(keyword);
+
         int printed = 0;
 
         try (BufferedReader reader = Files.newBufferedReader(file)) {
@@ -43,12 +59,16 @@ public class KeywordSearch {
                 String dataPart = line.substring(dataIndex);
                 String lower = dataPart.toLowerCase();
 
-                // Match keyword anywhere in the data object (keys OR values)
+                // Token-style match
                 if (!containsToken(lower, keyword)) continue;
 
                 String percent = extractJsonNumber(dataPart, "funds_raised_percent");
                 String closeDate = extractJsonString(dataPart, "close_date");
-                System.out.println("funds_raised_percent=" + percent + " | close_date=" + closeDate);
+
+                System.out.println(
+                        "funds_raised_percent=" + percent +
+                        " | close_date=" + closeDate
+                );
                 printed++;
             }
         }
@@ -58,9 +78,31 @@ public class KeywordSearch {
         }
     }
 
-    // ---------------- Helpers ----------------
+    // ================= Assignment 3 Methods =================
 
-    // token-ish match: "robot" matches "robot_id" and "robot"
+    private static void recordSearch(String keyword) {
+        searchHistory
+                .computeIfAbsent(keyword, k -> new ArrayList<>())
+                .add(LocalDateTime.now());
+    }
+
+    private static void printSearchHistory() {
+        System.out.println("\n=== Search History Summary ===");
+        System.out.println("Total unique search terms: " + searchHistory.size());
+
+        for (Map.Entry<String, List<LocalDateTime>> entry : searchHistory.entrySet()) {
+            System.out.println("\nKeyword: " + entry.getKey());
+            System.out.println("Times searched: " + entry.getValue().size());
+            System.out.println("Timestamps:");
+            for (LocalDateTime time : entry.getValue()) {
+                System.out.println("  - " + time);
+            }
+        }
+    }
+
+    // ================= Helper Methods =================
+
+    // token-ish match: "robot" matches "robot_id" and "robot", not "robotics"
     private static boolean containsToken(String text, String keyword) {
         int from = 0;
         while (true) {
@@ -72,11 +114,10 @@ public class KeywordSearch {
             boolean rightOk = (end >= text.length()) || !Character.isLetterOrDigit(text.charAt(end));
 
             if (leftOk && rightOk) return true;
-
             from = idx + 1;
         }
     }
-    // Extracts a JSON string value for a given key from a JSON object string
+
     private static String extractJsonString(String json, String key) {
         String k = "\"" + key + "\":";
         int i = json.indexOf(k);
@@ -88,13 +129,12 @@ public class KeywordSearch {
         if (i < json.length() && json.startsWith("null", i)) return "null";
         if (i >= json.length() || json.charAt(i) != '"') return "null";
 
-        i++; // skip opening quote
+        i++;
         StringBuilder sb = new StringBuilder();
         boolean escaping = false;
 
         while (i < json.length()) {
             char c = json.charAt(i);
-
             if (escaping) {
                 sb.append(c);
                 escaping = false;
@@ -107,10 +147,9 @@ public class KeywordSearch {
             }
             i++;
         }
-
         return sb.toString();
     }
-    // Extracts a JSON number value for a given key from a JSON object string
+
     private static String extractJsonNumber(String json, String key) {
         String k = "\"" + key + "\":";
         int i = json.indexOf(k);
